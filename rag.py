@@ -5,7 +5,7 @@ from langchain_community.vectorstores import Chroma
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 
 
 
@@ -14,7 +14,7 @@ import fitz
 import numpy as np
 
 
-os.environ["GOOGLE_API_KEY"]= r""
+os.environ["GOOGLE_API_KEY"]= r"AIzaSyAp2bZZKQLjkjcZjFU3P3xxgM6tgmMJSvg"
 embeddings = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
 
 query_llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
@@ -64,6 +64,15 @@ def embed_chunks_in_chroma(chunks, embeddings, persist_directory:str=None):
 
 
 def multi_query_translation(queries: typing.List[str], num_queries=5):
+    """
+    Docstring for multi_query_translation
+    
+    :param queries: List of queries to be translated. 
+    :type queries: List[str]
+    :param num_queries: Number of translations to make for each of the given queries. Default = 5
+    :return: Returns the new queries as a 2D array of shape (n, num_queries), where n=len(queries)
+    :rtype: List[List[str]]
+    """
     
     template = """You are an AI language model assistant. Your task is to generate {num_queries} 
     different versions of the given user question to retrieve relevant documents from a vector 
@@ -81,24 +90,43 @@ def multi_query_translation(queries: typing.List[str], num_queries=5):
         for i in queries
     ]
 
-    response = chain.batch(queries)
-    return response
+    responses = chain.batch(queries)
+    
+    output = [r.split('\n') for r in responses]
+    return output
 
 
 
-def decomposition_query_translation(query):
+def decomposition_query_translation(queries, num_queries=3):
 
     template = """You are a helpful assistant that generates multiple sub-questions related to an input question. \n
     The goal is to break down the input into a set of sub-problems / sub-questions that can be answers in isolation. \n
     Generate multiple search queries related to: {question} \n
-    Output (3 queries):"""
+    Your output should be ONLY sub-questions, without any numbering, separated by only a newline \n
+    Output ({num_queries} queries):"""
 
-    raise NotImplementedError("")
+    prompt = ChatPromptTemplate.from_template(template)
+
+    chain = prompt | query_llm
+
+    queries = [
+        {
+            'question': q, 
+            "num_queries": num_queries
+        }
+        for q in queries
+    ]
+
+    responses = chain.batch(queries)
+    output = [r.split('\n') for r in responses]
+
+    return output
+
 
 def step_back_query_translation(query: str):
 
     raise NotImplementedError("")
-    #check fcc implementation once
+        #check fcc implementation once
 
 def HyDE_query_translation(query: str, chunk_size: int):
 
@@ -107,6 +135,14 @@ def HyDE_query_translation(query: str, chunk_size: int):
     raise NotImplementedError("")
 
 
+## this is just for testing
+if __name__=='__main__':
+
+    responses = decomposition_query_translation(["What is the name of the insurer?", "How is this insurance policy going to change our profits?"])
+
+    for r in responses:
+        questions = r.content.split('\n')
+        print(questions)
 
     
 
