@@ -1,9 +1,11 @@
 import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import typing
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
 
 
 
@@ -14,6 +16,9 @@ import numpy as np
 
 os.environ["GOOGLE_API_KEY"]= r""
 embeddings = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
+
+query_llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
+generation_llm = query_llm
 
 
 
@@ -58,15 +63,28 @@ def embed_chunks_in_chroma(chunks, embeddings, persist_directory:str=None):
     return vector_db
 
 
-def multi_query_translation(query: str):
+def multi_query_translation(queries: typing.List[str], num_queries=5):
     
-    template = """You are an AI language model assistant. Your task is to generate five 
+    template = """You are an AI language model assistant. Your task is to generate {num_queries} 
     different versions of the given user question to retrieve relevant documents from a vector 
     database. By generating multiple perspectives on the user question, your goal is to help
     the user overcome some of the limitations of the distance-based similarity search. 
     Provide these alternative questions separated by newlines. Original question: {question}"""
 
-    raise NotImplementedError("")
+    prompt = ChatPromptTemplate.from_template(template)
+
+    chain = prompt | query_llm
+
+    queries = [
+        {"question": i,
+         "num_queries":num_queries} 
+        for i in queries
+    ]
+
+    response = chain.batch(queries)
+    return response
+
+
 
 def decomposition_query_translation(query):
 
@@ -87,6 +105,8 @@ def HyDE_query_translation(query: str, chunk_size: int):
     template = """Given the question '{query}', generate a hypothetical document that directly answers this question. The document should be detailed and in-depth. The document size has be exactly {chunk_size} characters."""
 
     raise NotImplementedError("")
+
+
 
     
 
