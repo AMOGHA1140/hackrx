@@ -128,21 +128,27 @@ def step_back_query_translation(query: str):
     raise NotImplementedError("")
         #check fcc implementation once
 
-def HyDE_query_translation(query: str, chunk_size: int):
+def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
 
     template = """Given the question '{query}', generate a hypothetical document that directly answers this question. The document should be detailed and in-depth. The document size has be exactly {chunk_size} characters."""
+    prompt = ChatPromptTemplate.from_template(template)
 
-    raise NotImplementedError("")
+    chain = prompt | query_llm
 
+    queries = [
+        {
+            "query": q,
+            "chunk_size":chunk_size
+        }
+        for q in queries
+    ]
 
-## this is just for testing
-if __name__=='__main__':
+    response = chain.batch(queries)
+    output = [r.content for r in response]
+    
+    return output
 
-    responses = decomposition_query_translation(["What is the name of the insurer?", "How is this insurance policy going to change our profits?"])
-
-    for r in responses:
-        questions = r.content.split('\n')
-        print(questions)
+    
 
     
 
