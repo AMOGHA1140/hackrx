@@ -6,6 +6,7 @@ from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+from Langchain_core.runnables import RunnableLambda
 
 
 
@@ -137,8 +138,25 @@ def decomposition_query_translation(queries, num_queries=3):
 
 def step_back_query_translation(query: str):
 
-    raise NotImplementedError("")
-        #check fcc implementation once
+    generate_queries_step_back = prompt | query_lm | StrOutputParser()
+    generate_queries_step_back.invoke({"question":query})
+
+    template = """You are an expert of world knowledge. I am going to ask you a question. Your response should be comprehensive and not contradicted with the following context if they are relevant. Otherwise, ignore them if they are not relevant. 
+    # {normal_context}
+    # {step_back_context}
+    # Original question: {question}
+    # Answer:"""
+
+    chain = (
+            {
+                "normal_context": RunnableLambda(lambda x: x["query"]) | retriever,
+                "step_back_context": generate_queries_step_back | retriever,
+                "question": lambda x: x["query"],
+            }
+            | response_prompt,
+            | query_llm
+            | StrOutputParser()
+    )
 
 def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
 
