@@ -14,7 +14,7 @@ import fitz
 import numpy as np
 
 
-os.environ["GOOGLE_API_KEY"]= r"AIzaSyAp2bZZKQLjkjcZjFU3P3xxgM6tgmMJSvg"
+os.environ["GOOGLE_API_KEY"]= r""
 embeddings = GoogleGenerativeAIEmbeddings(model='models/text-embedding-004')
 
 query_llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
@@ -63,6 +63,9 @@ def embed_chunks_in_chroma(chunks, embeddings, persist_directory:str=None):
     return vector_db
 
 
+
+
+#Functions for query translation
 def multi_query_translation(queries: typing.List[str], num_queries=5):
     """
     Docstring for multi_query_translation
@@ -95,8 +98,6 @@ def multi_query_translation(queries: typing.List[str], num_queries=5):
     output = [r.split('\n') for r in responses]
     return output
 
-
-
 def decomposition_query_translation(queries, num_queries=3):
 
     template = """You are a helpful assistant that generates multiple sub-questions related to an input question. \n
@@ -122,13 +123,21 @@ def decomposition_query_translation(queries, num_queries=3):
 
     return output
 
-
 def step_back_query_translation(query: str):
 
     raise NotImplementedError("")
         #check fcc implementation once
 
 def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
+    """
+    Generate a document containing a general answer for each of the given query, which can then be embedded later.
+
+    
+    queries: List[str] = list of queries to be translated
+
+    chunk_size: int = approx size of the document, so that the original embedded documents and hypothetical docs are of similar length.
+
+    """
 
     template = """Given the question '{query}', generate a hypothetical document that directly answers this question. The document should be detailed and in-depth. The document size has be exactly {chunk_size} characters."""
     prompt = ChatPromptTemplate.from_template(template)
@@ -147,8 +156,6 @@ def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
     output = [r.content for r in response]
     
     return output
-
-    
 
     
 
