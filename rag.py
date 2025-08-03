@@ -6,9 +6,10 @@ from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+from Langchain_core.runnables import RunnableLambda
 
 
-
+import json
 import fitz
 
 import numpy as np
@@ -21,21 +22,33 @@ query_llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash-lite')
 generation_llm = query_llm
 
 
-
-def get_text_from_pdf(pdf_path:str):
+def extract_text_from_web_pdf(pdf_url : str):    
     """
-    Docstring for get_text_from_pdf
+    Takes pdf's url as input and returns text of it.
     
-    :param pdf_path: The path of the pdf file
-    :type pdf_path: str
+    :pdf_url: URL to download the PDF.
     """
 
-    text = ""
+    try:
+        response = requests.get(pdf_url, timeout=30)
+        
+        response.raise_for_status()
+        pdf_in_memory = io.BytesIO(response.content)
+        
+        doc = fitz.open(stream=pdf_in_memory, filetype="pdf")
+        full_text = ""
 
-    with fitz.open(pdf_path) as doc:
-        for page in doc:
+        for page_num, page in enumerate(doc):
             full_text += page.get_text()
-    return text
+        
+        doc.close()
+        return full_text
+
+    except requests.exceptions.RequestException as e:
+        return f"Error downloading the PDF: {e}"
+    except Exception as e:
+        return f"An error occurred during PDF processing: {e}"
+
 
 def split_text(text:str, chunk_size:int=1000, chunk_overlap:int=150):
     """
@@ -125,8 +138,62 @@ def decomposition_query_translation(queries, num_queries=3):
 
 def step_back_query_translation(query: str):
 
-    raise NotImplementedError("")
-        #check fcc implementation once
+    examples = [
+    {
+        "input":"Could the members of the Police perform lawful arrests?",
+        "output":"What can the members of the Police do?"
+    },
+    {
+        "input": "Jan Sindel's was born in what country?",
+        "output": "What is Jan Sindel's personal history?",
+    }
+    ]
+
+    example_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("human", "{input}"),
+        ("ai", "{output}"),
+    ]
+    )
+
+    few_shot_prompt = FewShotChatMessagePromptTemplate(
+    example_prompt=example_prompt,
+    examples=examples,
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """You are an expert at world knowledge. Your task is to step back and paraphrase a question to a more generic step-back question, which is easier to answer. Here are a few examples:""",
+        ),
+        few_shot_prompt,
+        ("user", "{question}"),
+    ]
+    )
+
+
+    generate_queries_step_back = prompt | query_lm | StrOutputParser()
+    generate_queries_step_back.invoke({"question":query})
+
+    template = """You are an expert of world knowledge. I am going to ask you a question. Your response should be comprehensive and not contradicted with the following context if they are relevant. Otherwise, ignore them if they are not relevant. 
+    # {normal_context}
+    # {step_back_context}
+    # Original question: {question}
+    # Answer:"""
+
+    chain = (
+            {
+                "normal_context": RunnableLambda(lambda x: x["query"]) | retriever,
+                "step_back_context": generate_queries_step_back | retriever,
+                "question": lambda x: x["query"],
+            }
+            | response_prompt,
+            | query_llm
+            | StrOutputParser()
+    )
+
+    return chain.invoke({"question": query})
 
 def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
     """
