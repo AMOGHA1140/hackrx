@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptT
 from Langchain_core.runnables import RunnableLambda
 
 
-
+import json
 import fitz
 
 import numpy as np
@@ -138,6 +138,41 @@ def decomposition_query_translation(queries, num_queries=3):
 
 def step_back_query_translation(query: str):
 
+    examples = [
+    {
+        "input":"Could the members of the Police perform lawful arrests?",
+        "output":"What can the members of the Police do?"
+    },
+    {
+        "input": "Jan Sindel's was born in what country?",
+        "output": "What is Jan Sindel's personal history?",
+    }
+    ]
+
+    example_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("human", "{input}"),
+        ("ai", "{output}"),
+    ]
+    )
+
+    few_shot_prompt = FewShotChatMessagePromptTemplate(
+    example_prompt=example_prompt,
+    examples=examples,
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """You are an expert at world knowledge. Your task is to step back and paraphrase a question to a more generic step-back question, which is easier to answer. Here are a few examples:""",
+        ),
+        few_shot_prompt,
+        ("user", "{question}"),
+    ]
+    )
+
+
     generate_queries_step_back = prompt | query_lm | StrOutputParser()
     generate_queries_step_back.invoke({"question":query})
 
@@ -158,7 +193,7 @@ def step_back_query_translation(query: str):
             | StrOutputParser()
     )
 
-    return chain.invoke({"question": query}
+    return chain.invoke({"question": query})
 
 def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
 
