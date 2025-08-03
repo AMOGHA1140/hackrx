@@ -158,6 +158,8 @@ def step_back_query_translation(query: str):
             | StrOutputParser()
     )
 
+    return chain.invoke({"question": query}
+
 def HyDE_query_translation(queries: typing.List[str], chunk_size: int):
 
     template = """Given the question '{query}', generate a hypothetical document that directly answers this question. The document should be detailed and in-depth. The document size has be exactly {chunk_size} characters."""
